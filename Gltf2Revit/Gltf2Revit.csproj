@@ -101,10 +101,13 @@
   <ItemGroup>
     <None Include="app.config" />
     <None Include="packages.config" />
-    <None Include="RegisterAddin.addin" />
+    <None Include="Gltf2RevitAddin.addin" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\importGltf.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Resources\demo.gif" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
