@@ -1,11 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <RevitAddIns>
   <AddIn Type="Application">
-    <Name>Gltf2Revit</Name>
+    <Name>ImportGltf</Name>
     <Assembly>./Gltf2Revit/Gltf2Revit.dll</Assembly>
     <FullClassName>Gltf2Revit.App</FullClassName>
     <ClientId>8804A1D2-1542-A665-9657-C2EC8741F822</ClientId>
-    <VendorId>yijianar.com</VendorId>
+    <VendorId>bingyongcao</VendorId>
     <VendorDescription></VendorDescription>
   </AddIn>
 </RevitAddIns>

@@ -15,24 +15,12 @@ namespace Gltf2Revit
         {
             ControlledApplication app = a.ControlledApplication;
 
-            string tabName = "以见测试";
-            try
-            {
-                a.CreateRibbonTab(tabName);
-            }
-            catch (Autodesk.Revit.Exceptions.ArgumentException)
-            {
-                // Do nothing.
-            }
-
-            // Add a new ribbon panel
-            RibbonPanel newPanel = a.CreateRibbonPanel(tabName, "测试面板");
-
+            RibbonPanel newPanel = a.CreateRibbonPanel("Import Tools");
             string thisAssemblyPath = Assembly.GetExecutingAssembly().Location;
-            PushButtonData buttonData = new PushButtonData("gltf2revit",
-                "gltf2revit", thisAssemblyPath, "Gltf2Revit.Command");
+            PushButtonData buttonData = new PushButtonData("ImportGltf",
+                "ImportGltf", thisAssemblyPath, "Gltf2Revit.Command");
             PushButton pushButton = newPanel.AddItem(buttonData) as PushButton;
-            pushButton.LargeImage = BmpImageSource(@"Gltf2Revit.Resources.icons8-scroll-3296.png");
+            pushButton.LargeImage = BmpImageSource(@"Gltf2Revit.Resources.importGltf.png");
 
             return Result.Succeeded;
         }

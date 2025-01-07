@@ -4,6 +4,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
+using SharpGLTF.Schema2;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,6 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
+using System.Windows.Media.Imaging;
 using Application = Autodesk.Revit.ApplicationServices.Application;
 
 #endregion
@@ -20,7 +22,7 @@ namespace Gltf2Revit
     [Transaction(TransactionMode.Manual)]
     public class Command : IExternalCommand
     {
-        private const double m_to_foot = 1000.0 / 304.8;
+        public const double m_to_foot = 1000.0 / 304.8;
         public Result Execute(
           ExternalCommandData commandData,
           ref string message,
@@ -34,36 +36,46 @@ namespace Gltf2Revit
             AppDomain currentDomain = AppDomain.CurrentDomain;
             currentDomain.AssemblyResolve += new ResolveEventHandler(MyResolveEventHandler);
 
-            var gltfModel = SharpGLTF.Schema2.ModelRoot.Load(
-                @"E:\ModelPipe_Files\Ifc_files\电塔.glb");
+            OpenFileDialog dlg = new OpenFileDialog();
+            dlg.Title = "choose a gltf file";
+            dlg.CheckFileExists = true;
+            dlg.Filter = "gltf file|*.glb;*.gltf";
+            dlg.RestoreDirectory = true;
+            if (dlg.ShowDialog() != DialogResult.OK)
+                return Result.Cancelled;
 
-            TessellatedShapeBuilder builder = new TessellatedShapeBuilder();
-            builder.OpenConnectedFaceSet(false);
+            var gltfModel = ModelRoot.Load(dlg.FileName);
+
             List<XYZ> loopVertices = new List<XYZ>(3);
 
             for (int i = 0; i < gltfModel.LogicalMeshes.Count; i++)
             {
                 var mesh = gltfModel.LogicalMeshes[i];
+
+                TessellatedShapeBuilder builder = new TessellatedShapeBuilder();
+                builder.OpenConnectedFaceSet(false);
+
                 for (int j = 0; j < mesh.Primitives.Count; j++)
                 {
                     var primitive = mesh.Primitives[j];
                     var vertices = primitive.GetVertices("POSITION").AsVector3Array();
+                    var indices = primitive.GetIndices();
 
-                    for (int k = 0; k < vertices.Count / 3; k+=3)
+                    for (int k = 0; k < indices.Count; k+=3)
                     {
                         loopVertices.Clear();
                         loopVertices.Add(new XYZ(
-                            vertices[k].X * m_to_foot, 
-                            vertices[k].Z * m_to_foot, 
-                            vertices[k].Y * m_to_foot));
+                            vertices[(int)indices[k]].X * m_to_foot, 
+                            vertices[(int)indices[k]].Z * m_to_foot,
+                            vertices[(int)indices[k]].Y * m_to_foot));
                         loopVertices.Add(new XYZ(
-                            vertices[k + 1].X * m_to_foot, 
-                            vertices[k + 1].Z * m_to_foot, 
-                            vertices[k + 1].Y * m_to_foot));
+                            vertices[(int)indices[k + 1]].X * m_to_foot, 
+                            vertices[(int)indices[k + 1]].Z * m_to_foot,
+                            vertices[(int)indices[k + 1]].Y * m_to_foot));
                         loopVertices.Add(new XYZ(
-                            vertices[k + 2].X * m_to_foot, 
-                            vertices[k + 2].Z * m_to_foot, 
-                            vertices[k + 2].Y * m_to_foot));
+                            vertices[(int)indices[k + 2]].X * m_to_foot, 
+                            vertices[(int)indices[k + 2]].Z * m_to_foot,
+                            vertices[(int)indices[k + 2]].Y * m_to_foot));
 
                         var tesseFace = new TessellatedFace(loopVertices, ElementId.InvalidElementId);
                         if (builder.DoesFaceHaveEnoughLoopsAndVertices(tesseFace))
@@ -71,31 +83,28 @@ namespace Gltf2Revit
                             builder.AddFace(tesseFace);
                         }
                     }
-
-                    //MessageBox.Show($"Key: {f[k]}", "提示");
                 }
-            }
 
-            builder.CloseConnectedFaceSet();
-            builder.Target = TessellatedShapeBuilderTarget.AnyGeometry;
-            builder.Fallback = TessellatedShapeBuilderFallback.Mesh;
-            builder.Build();
+                builder.CloseConnectedFaceSet();
+                builder.Target = TessellatedShapeBuilderTarget.AnyGeometry;
+                builder.Fallback = TessellatedShapeBuilderFallback.Mesh;
+                builder.Build();
 
-            TessellatedShapeBuilderResult result = builder.GetBuildResult();
-            // Modify document within a transaction
+                // Modify document within a transaction
+                using (Transaction tx = new Transaction(doc))
+                {
+                    tx.Start("insert one mesh");
+                    
+                    DirectShape ds = DirectShape.CreateElement(doc, 
+                        new ElementId(BuiltInCategory.OST_GenericModel));
+                    ds.ApplicationId = Assembly.GetExecutingAssembly().GetType().GUID.ToString();
+                    ds.ApplicationDataId = Guid.NewGuid().ToString();
+                    TessellatedShapeBuilderResult result = builder.GetBuildResult();
+                    ds.SetShape(result.GetGeometricalObjects());
+                    ds.Name = "importedMesh";
 
-            using (Transaction tx = new Transaction(doc))
-            {
-                tx.Start("Transaction Name");
-
-                DirectShape ds = DirectShape.CreateElement(doc, new ElementId(BuiltInCategory.OST_GenericModel));
-                ds.ApplicationId = Assembly.GetExecutingAssembly().GetType().GUID.ToString();
-                ds.ApplicationDataId = Guid.NewGuid().ToString();
-
-                ds.SetShape(result.GetGeometricalObjects());
-
-                ds.Name = "MyShape";
-                tx.Commit();
+                    tx.Commit();
+                }
             }
 
             return Result.Succeeded;
@@ -113,7 +122,6 @@ namespace Gltf2Revit
             }
             else
             {
-                //TaskDialog.Show("ERROR", $"未找到以下程序集:{text}");
                 result = null;
             }
             return result;

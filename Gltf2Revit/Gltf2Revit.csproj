@@ -104,7 +104,7 @@
     <None Include="RegisterAddin.addin" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\icons8-scroll-3296.png" />
+    <EmbeddedResource Include="Resources\importGltf.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
