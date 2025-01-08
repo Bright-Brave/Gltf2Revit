@@ -15,7 +15,16 @@ namespace Gltf2Revit
         {
             ControlledApplication app = a.ControlledApplication;
 
-            RibbonPanel newPanel = a.CreateRibbonPanel("Import Tools");
+            RibbonPanel newPanel = null;
+            try
+            {
+                newPanel = a.CreateRibbonPanel("Import Tools");
+            }
+            catch (System.Exception)
+            {
+                newPanel = a.GetRibbonPanels().Find(x => x.Name == "Import Tools");
+            }
+
             string thisAssemblyPath = Assembly.GetExecutingAssembly().Location;
             PushButtonData buttonData = new PushButtonData("ImportGltf",
                 "ImportGltf", thisAssemblyPath, "Gltf2Revit.Command");
