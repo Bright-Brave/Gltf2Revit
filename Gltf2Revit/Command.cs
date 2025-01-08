@@ -2,6 +2,7 @@
 using Autodesk.Revit.ApplicationServices;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
+using Autodesk.Revit.Exceptions;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
 using SharpGLTF.Schema2;
@@ -10,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Reflection;
 using System.Windows.Forms;
 using System.Windows.Media.Imaging;
@@ -46,6 +48,8 @@ namespace Gltf2Revit
 
             var gltfModel = ModelRoot.Load(dlg.FileName);
 
+            List<ElementId> matIds = CreateRevitMaterials(doc, gltfModel);
+
             List<XYZ> loopVertices = new List<XYZ>(3);
 
             for (int i = 0; i < gltfModel.LogicalMeshes.Count; i++)
@@ -61,23 +65,25 @@ namespace Gltf2Revit
                     var vertices = primitive.GetVertices("POSITION").AsVector3Array();
                     var indices = primitive.GetIndices();
 
+                    ElementId matId = matIds[primitive.Material.LogicalIndex];
+
                     for (int k = 0; k < indices.Count; k+=3)
                     {
                         loopVertices.Clear();
                         loopVertices.Add(new XYZ(
-                            vertices[(int)indices[k]].X * m_to_foot, 
+                            -vertices[(int)indices[k]].X * m_to_foot, 
                             vertices[(int)indices[k]].Z * m_to_foot,
                             vertices[(int)indices[k]].Y * m_to_foot));
                         loopVertices.Add(new XYZ(
-                            vertices[(int)indices[k + 1]].X * m_to_foot, 
+                            -vertices[(int)indices[k + 1]].X * m_to_foot, 
                             vertices[(int)indices[k + 1]].Z * m_to_foot,
                             vertices[(int)indices[k + 1]].Y * m_to_foot));
                         loopVertices.Add(new XYZ(
-                            vertices[(int)indices[k + 2]].X * m_to_foot, 
+                            -vertices[(int)indices[k + 2]].X * m_to_foot, 
                             vertices[(int)indices[k + 2]].Z * m_to_foot,
                             vertices[(int)indices[k + 2]].Y * m_to_foot));
 
-                        var tesseFace = new TessellatedFace(loopVertices, ElementId.InvalidElementId);
+                        var tesseFace = new TessellatedFace(loopVertices, matId);
                         if (builder.DoesFaceHaveEnoughLoopsAndVertices(tesseFace))
                         {
                             builder.AddFace(tesseFace);
@@ -108,6 +114,63 @@ namespace Gltf2Revit
             }
 
             return Result.Succeeded;
+        }
+
+        
+        private List<ElementId> CreateRevitMaterials(Document doc, ModelRoot gltfModel)
+        {
+            List<ElementId> matIds = new List<ElementId>();
+            using (Transaction tx = new Transaction(doc))
+            {
+                tx.Start("Create Materials");
+                for (int i = 0; i < gltfModel.LogicalMaterials.Count; i++)
+                {
+                    var mat = gltfModel.LogicalMaterials[i];
+                    matIds.Add(CreateRevitMaterial(doc, mat));
+                }
+                tx.Commit();
+            }
+            return matIds;
+        }
+
+        private ElementId CreateRevitMaterial(Document doc, SharpGLTF.Schema2.Material mat)
+        {
+            ElementId matId = ElementId.InvalidElementId;
+            if (mat == null)
+                return matId;
+
+            // Create a new material
+            try
+            {
+                matId = Autodesk.Revit.DB.Material.Create(doc,
+                    RevitUtil.GetValidName(mat.Name));
+            }
+            catch (Autodesk.Revit.Exceptions.ArgumentException)
+            {
+                // material name already exists
+                matId = Autodesk.Revit.DB.Material.Create(doc,
+                    Guid.NewGuid().ToString());
+            }
+            
+            // Set the material's color
+            MaterialChannel? baseColor = mat.FindChannel("BaseColor");
+            if (baseColor == null)
+                return ElementId.InvalidElementId;
+            var rgba = (Vector4)baseColor.Value.Parameters[0].Value;
+            float red = rgba.X;
+            float green = rgba.Y;
+            float blue = rgba.Z;
+            float opacity = rgba.W;
+            Color color = new Color(
+                (byte)(red * 255.0f), 
+                (byte)(green * 255.0f), 
+                (byte)(blue * 255.0f));
+            var material = doc.GetElement(matId) as Autodesk.Revit.DB.Material;
+            material.Color = color;
+            // Set the material's transparency
+            material.Transparency = (int)(1 - opacity) * 100;
+
+            return matId;
         }
 
         private Assembly MyResolveEventHandler(object sender, ResolveEventArgs args)

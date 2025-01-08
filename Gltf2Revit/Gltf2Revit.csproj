@@ -97,6 +97,7 @@
     <Compile Include="App.cs" />
     <Compile Include="Command.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RevitUtil.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
@@ -105,9 +106,6 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\importGltf.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Resources\demo.gif" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
